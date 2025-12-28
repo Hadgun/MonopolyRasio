@@ -609,6 +609,49 @@
         #restartBtn:hover {
             background: #45a049;
         }
+
+        /* Win prolog */
+        #winProlog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            color: white;
+            text-align: center;
+            padding: 40px;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        #winProlog h1 {
+            font-size: 4em;
+            margin-bottom: 30px;
+            text-shadow: 4px 4px 8px rgba(0,0,0,0.5);
+            animation: bounce 1s infinite;
+        }
+
+        #winProlog p {
+            font-size: 1.5em;
+            max-width: 800px;
+            line-height: 1.8;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+        }
+
+        .win-content {
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            text-align: center;
+            animation: slideIn 0.5s;
+            max-width: 600px;
+        }
     </style>
 </head>
 <body>
@@ -694,11 +737,20 @@
         </div>
     </div>
 
+    <!-- Win Prolog -->
+    <div id="winProlog">
+        <h1>🎉 SELAMAT! 🎉</h1>
+        <p>Anda telah menyelesaikan misi yang sangat menantang!</p>
+        <p>Kalian berhasil melewati semua rintangan alam dan menyelamatkan diri dari jalur pendakian.</p>
+        <p id="winPrologMessage"></p>
+    </div>
+
     <!-- Win Modal -->
     <div id="winModal">
         <div class="win-content">
-            <h2>🎉 SELAMAT! 🎉</h2>
+            <h2>🏆 HASIL AKHIR 🏆</h2>
             <p id="winnerText"></p>
+            <p style="font-size:1.2em;margin-top:20px;color:#f39c12;">Terima kasih telah bermain!<br>Coba lagi dan raih skor yang lebih tinggi!</p>
             <button id="restartBtn">Main Lagi</button>
         </div>
     </div>
@@ -1048,7 +1100,7 @@
                         players[currentPlayerIndex].position = TILES.length - 1;
                         players[currentPlayerIndex].finished = true;
                         updatePiecePosition(currentPlayerIndex);
-                        checkWinner();
+                        nextPlayer();
                     }
                 }, 1000);
             } else if (tile.type === 'pit') {
@@ -1063,7 +1115,9 @@
             } else if (tile.type === 'wild') {
                 showCard('red');
             } else if (tile.name === 'FINISH') {
-                checkWinner();
+                // Player reached FINISH, mark as finished and continue to next player
+                players[currentPlayerIndex].finished = true;
+                nextPlayer();
             } else {
                 nextPlayer();
             }
@@ -1126,11 +1180,6 @@
         }
 
         function nextPlayer() {
-            if (players[currentPlayerIndex].finished) {
-                checkWinner();
-                return;
-            }
-            
             currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
             
             // Skip finished players
@@ -1140,6 +1189,14 @@
                 attempts++;
             }
             
+            // Check if all players have finished
+            const allFinished = players.every(p => p.finished);
+            if (allFinished) {
+                checkWinner();
+                return;
+            }
+            
+            // If we've cycled through all players and they're all finished, show winner
             if (attempts >= players.length) {
                 checkWinner();
                 return;
@@ -1160,13 +1217,39 @@
                 finishedPlayers.sort((a, b) => b.score - a.score);
                 const winner = finishedPlayers[0];
                 
-                const winModal = document.getElementById('winModal');
-                const winnerText = document.getElementById('winnerText');
-                winnerText.innerHTML = `
-                    <strong>${winner.name}</strong> menang dengan <strong>${winner.score} poin</strong>!<br><br>
-                    ${finishedPlayers.map((p, i) => `${i + 1}. ${p.name}: ${p.score} poin`).join('<br>')}
-                `;
-                winModal.style.display = 'flex';
+                // Show win prolog first
+                const winProlog = document.getElementById('winProlog');
+                const prologMsg = document.getElementById('winPrologMessage');
+                
+                // Personalized message based on score
+                let message = '';
+                if (winner.score >= 100) {
+                    message = `${winner.name} luar biasa! Skor sempurna Anda menunjukkan dedikasi dan kerja keras yang luar biasa!`;
+                } else if (winner.score >= 70) {
+                    message = `${winner.name} hebat! Anda menunjukkan kemampuan yang mengesankan dalam menyelesaikan tantangan!`;
+                } else if (winner.score >= 50) {
+                    message = `Bagus ${winner.name}! Anda telah menunjukkan usaha yang baik. Coba lagi dan raih skor lebih tinggi!`;
+                } else {
+                    message = `Semangat ${winner.name}! Setiap langkah adalah pembelajaran. Mari coba lagi dengan strategi yang lebih baik!`;
+                }
+                
+                prologMsg.textContent = message;
+                winProlog.style.display = 'flex';
+                
+                // Show results after 4 seconds
+                setTimeout(() => {
+                    winProlog.style.display = 'none';
+                    
+                    const winModal = document.getElementById('winModal');
+                    const winnerText = document.getElementById('winnerText');
+                    winnerText.innerHTML = `
+                        🏆 <strong>${winner.name}</strong> Menang! 🏆<br><br>
+                        <strong>Skor: ${winner.score} Poin</strong><br><br>
+                        <strong>Peringkat Akhir:</strong><br>
+                        ${finishedPlayers.map((p, i) => `${i + 1}. ${p.name}: ${p.score} poin`).join('<br>')}
+                    `;
+                    winModal.style.display = 'flex';
+                }, 4000);
             }
         }
 
