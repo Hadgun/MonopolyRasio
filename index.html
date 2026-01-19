@@ -706,6 +706,7 @@
             <audio id="moveSound2" src="assets/sound/move2.mp3" preload="auto"></audio>
             <audio id="moveSound3" src="assets/sound/move3.mp3" preload="auto"></audio>
             <audio id="moveSound4" src="assets/sound/move4.mp3" preload="auto"></audio>
+            <audio id="successSound" src="assets/sound/success.mp3" preload="auto"></audio>
         </div>
     </div>
 
@@ -1235,6 +1236,12 @@
                 
                 prologMsg.textContent = message;
                 winProlog.style.display = 'flex';
+
+                // Play success sound
+                try {
+                    const successSound = document.getElementById('successSound');
+                    if (successSound) { successSound.currentTime = 0; successSound.play(); }
+                } catch (e) { /* ignore audio errors */ }
                 
                 // Show results after 4 seconds
                 setTimeout(() => {
