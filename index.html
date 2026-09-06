@@ -699,7 +699,7 @@
             <div id="playersList"></div>
             <button id="rollButton">🎲 Lempar Dadu</button>
             <button id="musicToggle" style="margin-top:8px;background:linear-gradient(135deg,#6f9ce8,#3aa3bd);color:white;border:none;padding:10px;border-radius:8px;cursor:pointer;">🔊 Musik</button>
-            <audio id="bgMusic" src="assets/sound/background.mp3.mp3" loop preload="auto"></audio>
+            <audio id="bgMusic" src="assets/sound/background.mp3" loop preload="auto"></audio>
             <audio id="diceSound" src="assets/sound/dice.mp3" preload="auto"></audio>
             <audio id="selectSound" src="assets/sound/select.mp3" preload="auto"></audio>
             <audio id="moveSound1" src="assets/sound/move1.mp3" preload="auto"></audio>
@@ -820,6 +820,25 @@
         let isRolling = false;
         let playerPieces = [];
         let gameStarted = false;
+
+        // Card Decks (Fisher-Yates Managed)
+        let deckBlue = [];
+        let deckRed = [];
+
+        // Fungsi Algoritma Fisher-Yates Shuffle
+        function shuffleArray(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function initDecks() {
+            deckBlue = shuffleArray(BLUE_CARDS);
+            deckRed = shuffleArray(RED_CARDS);
+        }
         
         // Avatar selection state
         const AVATAR_CHOICES = [
@@ -842,6 +861,9 @@
             document.getElementById('playerSelection').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'block';
             
+            // Inisialisasi dan acak tumpukan kartu awal
+            initDecks();
+
             // Initialize players
             const colors = ['#FF6B6B', '#4ECDC4', '#FFD93D', '#95E1D3'];
             const names = ['Pemain 1', 'Pemain 2', 'Pemain 3', 'Pemain 4'];
@@ -900,12 +922,6 @@
             const sideTileWidth = 10;
             const sideTileHeight = 16;
             
-            // Define positions for each side (21 tiles total)
-            // Sisi Bawah: 6 tiles (indeks 0-5)
-            // Sisi Kanan: 5 tiles (indeks 6-10)
-            // Sisi Atas: 6 tiles (indeks 11-16)
-            // Sisi Kiri: 4 tiles (indeks 17-20)
-            
             TILES.forEach((tile, index) => {
                 const tileEl = document.createElement('div');
                 tileEl.className = `tile ${tile.type}`;
@@ -948,12 +964,17 @@
                     left = 0;
                     top = 0;
                 }
-                else if (index >= 18 && index <= 20) { // Sisi Kiri (vertikal)
+                else if (index >= 18 && index <= 19) { // Sisi Kiri (vertikal)
                     tileEl.classList.add('vertical');
                     left = 0;
                     top = (index - 17) * ((boardSize - 2 * cornerSize) / 4);
                 }
-                else { // FINISH (indeks 20) - Kiri Bawah
+                else if (index === 20) { // FINISH (indeks 20) - Kiri Bawah
+                    tileEl.classList.add('corner');
+                    left = 0;
+                    top = boardSize - cornerSize;
+                } else {
+                    // Fallback: treat remaining indexes as corner
                     tileEl.classList.add('corner');
                     left = 0;
                     top = boardSize - cornerSize;
@@ -986,7 +1007,7 @@
                     piece.textContent = '';
                 } else {
                     piece.style.backgroundColor = player.color;
-                    piece.textContent = index + 1; // Show player number
+                    piece.textContent = index + 1;
                 }
                 
                 container.appendChild(piece);
@@ -1007,7 +1028,6 @@
             const containerRect = document.getElementById('boardContainer').getBoundingClientRect();
             const tileRect = tileEl.getBoundingClientRect();
             
-            // Calculate offsets for multiple players on same tile
             const playerCount = players.filter(p => p.position === player.position).length;
             const playerOrder = players.slice(0, playerIndex + 1).filter(p => p.position === player.position).length - 1;
             
@@ -1018,14 +1038,12 @@
             const offsetX = Math.cos(angle) * radius;
             const offsetY = Math.sin(angle) * radius;
             
-            // Position piece at center of tile
             const tileCenterX = tileRect.left + tileRect.width / 2;
             const tileCenterY = tileRect.top + tileRect.height / 2;
             
             piece.style.left = (tileCenterX - containerRect.left + offsetX - 17.5) + 'px';
             piece.style.top = (tileCenterY - containerRect.top + offsetY - 17.5) + 'px';
             
-            // Update active state
             document.querySelectorAll('.player-piece').forEach(p => p.classList.remove('active'));
             if (playerIndex === currentPlayerIndex && !isRolling) {
                 piece.classList.add('active');
@@ -1039,7 +1057,6 @@
             document.getElementById('rollButton').disabled = true;
             document.getElementById('rollButton').textContent = '🎲 Melempar...';
 
-            // play dice sound
             try {
                 const dice = document.getElementById('diceSound');
                 if (dice) { dice.currentTime = 0; dice.play(); }
@@ -1081,7 +1098,6 @@
                 players[currentPlayerIndex].position = current;
                 updatePiecePosition(currentPlayerIndex);
 
-                // play move sound mapped to player's avatar
                 try {
                     const idx = (players[currentPlayerIndex].avatarIndex !== undefined) ? players[currentPlayerIndex].avatarIndex : 0;
                     const move = document.getElementById(`moveSound${(idx % 4) + 1}`);
@@ -1116,7 +1132,6 @@
             } else if (tile.type === 'wild') {
                 showCard('red');
             } else if (tile.name === 'FINISH') {
-                // Player reached FINISH, mark as finished and continue to next player
                 players[currentPlayerIndex].finished = true;
                 nextPlayer();
             } else {
@@ -1125,8 +1140,21 @@
         }
 
         function showCard(type) {
-            const cards = type === 'blue' ? BLUE_CARDS : RED_CARDS;
-            const card = cards[Math.floor(Math.random() * cards.length)];
+            let deck = type === 'blue' ? deckBlue : deckRed;
+            
+            // Jika tumpukan kartu habis, kocok ulang menggunakan Fisher-Yates
+            if (deck.length === 0) {
+                if (type === 'blue') {
+                    deckBlue = shuffleArray(BLUE_CARDS);
+                    deck = deckBlue;
+                } else {
+                    deckRed = shuffleArray(RED_CARDS);
+                    deck = deckRed;
+                }
+            }
+
+            // Ambil kartu teratas dari deck yang sudah diacak
+            const card = deck.pop();
             
             const modal = document.getElementById('cardModal');
             const header = document.getElementById('cardHeader');
@@ -1144,20 +1172,20 @@
                 const btn = document.createElement('button');
                 btn.className = 'answer-btn ' + type;
                 btn.textContent = String.fromCharCode(65 + index) + '. ' + answer;
-                btn.onclick = () => checkAnswer(index, card.correct, type);
+                btn.onclick = () => checkAnswer(index, card.correct, card.a[card.correct], type);
                 answersGrid.appendChild(btn);
             });
             
             modal.style.display = 'flex';
         }
 
-        function checkAnswer(selected, correct, type) {
+        function checkAnswer(selected, correctIndex, correctAnswerText, type) {
             const buttons = document.querySelectorAll('.answer-btn');
             buttons.forEach((btn, index) => {
                 btn.disabled = true;
-                if (index === correct) {
+                if (index === correctIndex) {
                     btn.classList.add('correct');
-                } else if (index === selected && index !== correct) {
+                } else if (index === selected && index !== correctIndex) {
                     btn.classList.add('wrong');
                 }
             });
@@ -1165,11 +1193,12 @@
             const resultDiv = document.getElementById('resultMessage');
             const points = type === 'blue' ? 5 : 10;
             
-            if (selected === correct) {
+            if (selected === correctIndex) {
                 players[currentPlayerIndex].score += points;
                 resultDiv.innerHTML = `<div class="result-message correct">✅ BENAR! +${points} Poin</div>`;
             } else {
-                resultDiv.innerHTML = `<div class="result-message wrong">❌ SALAH! Jawaban yang benar: ${String.fromCharCode(65 + correct)}</div>`;
+                // Notifikasi menampilkan teks jawaban yang benar
+                resultDiv.innerHTML = `<div class="result-message wrong">❌ SALAH! Jawaban yang benar: ${correctAnswerText}</div>`;
             }
             
             updatePlayersList();
@@ -1183,21 +1212,18 @@
         function nextPlayer() {
             currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
             
-            // Skip finished players
             let attempts = 0;
             while (players[currentPlayerIndex].finished && attempts < players.length) {
                 currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
                 attempts++;
             }
             
-            // Check if all players have finished
             const allFinished = players.every(p => p.finished);
             if (allFinished) {
                 checkWinner();
                 return;
             }
             
-            // If we've cycled through all players and they're all finished, show winner
             if (attempts >= players.length) {
                 checkWinner();
                 return;
@@ -1214,15 +1240,12 @@
             const finishedPlayers = players.filter(p => p.finished);
             
             if (finishedPlayers.length > 0) {
-                // Sort by score
                 finishedPlayers.sort((a, b) => b.score - a.score);
                 const winner = finishedPlayers[0];
                 
-                // Show win prolog first
                 const winProlog = document.getElementById('winProlog');
                 const prologMsg = document.getElementById('winPrologMessage');
                 
-                // Personalized message based on score
                 let message = '';
                 if (winner.score >= 100) {
                     message = `${winner.name} luar biasa! Skor sempurna Anda menunjukkan dedikasi dan kerja keras yang luar biasa!`;
@@ -1237,13 +1260,11 @@
                 prologMsg.textContent = message;
                 winProlog.style.display = 'flex';
 
-                // Play success sound
                 try {
                     const successSound = document.getElementById('successSound');
                     if (successSound) { successSound.currentTime = 0; successSound.play(); }
                 } catch (e) { /* ignore audio errors */ }
                 
-                // Show results after 4 seconds
                 setTimeout(() => {
                     winProlog.style.display = 'none';
                     
@@ -1284,7 +1305,6 @@
             avatarCurrentIndex = 0;
             chosenAvatars = [];
             renderAvatarModal();
-            // hide the player selection overlay so modal receives clicks
             const ps = document.getElementById('playerSelection');
             if (ps) ps.style.display = 'none';
             document.getElementById('avatarModal').style.display = 'flex';
@@ -1308,12 +1328,10 @@
             document.getElementById('avatarPrev').style.display = avatarCurrentIndex > 0 ? 'inline-block' : 'none';
             document.getElementById('avatarNext').textContent = avatarCurrentIndex < avatarPickCount - 1 ? 'Konfirmasi & Lanjut' : 'Selesai';
 
-            // Clear previous selection highlights
             document.querySelectorAll('.avatar-item').forEach(el => el.classList.remove('selected'));
         }
 
         function selectAvatar(index) {
-            // highlight selected
             document.querySelectorAll('.avatar-item').forEach(el => el.classList.remove('selected'));
             const el = document.querySelector(`.avatar-item[data-idx='${index}']`);
             if (el) el.classList.add('selected');
@@ -1322,9 +1340,8 @@
         document.addEventListener('click', (e) => {
             if (e.target && e.target.id === 'avatarNext') {
                 const sel = document.querySelector('.avatar-item.selected');
-                if (!sel) return; // require selection
+                if (!sel) return;
 
-                // play select sound
                 try {
                     const selSound = document.getElementById('selectSound');
                     if (selSound) { selSound.currentTime = 0; selSound.play(); }
